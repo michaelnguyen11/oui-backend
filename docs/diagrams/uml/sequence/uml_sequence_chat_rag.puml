@@ -1,0 +1,92 @@
+@startuml Sequence_Chat_Message_RAG
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+' Define participants
+actor "End User" as User
+participant "Frontend SPA" as FE
+participant "Web App\n(FastAPI)" as WA
+participant "Chat Router\n(/api/v1/chats)" as ChatRouter
+participant "Auth Utilities\n(utils/auth.py)" as AuthUtils
+participant "Chat Orchestration\n(utils/chat.py)" as ChatOrchestrator
+participant "RAG Utils\n(retrieval/utils.py)" as RAGUtils
+participant "Vector DB Client\n(retrieval/vector/connector.py)" as VectorClient
+participant "LLM Service\n(External/Local)" as LLMService
+participant "Messages Table\n(models/messages.py)" as MessagesTable
+participant "Real-time Layer\n(socket/main.py)" as SocketLayer
+
+title Sequence Diagram: User Sends Chat Message (with RAG Enabled)
+
+User -> FE: Enters message
+FE -> WA: POST /api/v1/chats/{chat_id}/message (MessageForm)
+WA -> ChatRouter: Handle message request (chat_id, form_data)
+activate ChatRouter
+
+ChatRouter -> AuthUtils: Depends(get_verified_user)
+activate AuthUtils
+AuthUtils --> ChatRouter: UserModel (user)
+deactivate AuthUtils
+
+' Store user message first (simplified)
+ChatRouter -> MessagesTable: insert_new_message(form_data, chat_id, user.id)
+activate MessagesTable
+MessagesTable --> ChatRouter: MessageModel (user_msg)
+deactivate MessagesTable
+
+ChatRouter -> ChatOrchestrator: generate_chat_completion(user, chat, user_msg, ...)
+activate ChatOrchestrator
+
+opt RAG Enabled for this Chat
+    ChatOrchestrator -> RAGUtils: get_embedding_function()
+    activate RAGUtils
+    RAGUtils --> ChatOrchestrator: embed_func
+    ChatOrchestrator -> RAGUtils: embed_func(user_msg.content)
+    RAGUtils --> ChatOrchestrator: query_embedding
+
+    ChatOrchestrator -> RAGUtils: query_collection_with_hybrid_search(collection, query, embed_func, k, rerank_func, r)
+    activate RAGUtils
+    RAGUtils -> VectorClient: search(...) / get(...)
+    activate VectorClient
+    VectorClient --> RAGUtils: Vector DB Results
+    deactivate VectorClient
+    ' BM25, Ensemble, Reranking logic within RAGUtils (simplified)
+    RAGUtils --> ChatOrchestrator: List[Document] (retrieved_docs)
+    deactivate RAGUtils
+
+    ChatOrchestrator -> ChatOrchestrator: Format prompt with retrieved_docs + user_msg.content
+end
+
+ChatOrchestrator -> LLMService: Request Completion (formatted_prompt, model, stream=True)
+activate LLMService
+
+loop Streaming Response
+    LLMService --> ChatOrchestrator: Stream Chunk (delta)
+    ChatOrchestrator -> SocketLayer: emit_event('channel-events', {type: 'stream', data: delta}, room=chat_id)
+    activate SocketLayer
+    SocketLayer --> ChatOrchestrator: (ack)
+    deactivate SocketLayer
+end
+
+LLMService --> ChatOrchestrator: Final Response / Completion Status
+deactivate LLMService
+
+ChatOrchestrator -> ChatOrchestrator: Aggregate final response text
+
+ChatOrchestrator -> MessagesTable: insert_new_message(response_text, chat_id, 'assistant')
+activate MessagesTable
+MessagesTable --> ChatOrchestrator: MessageModel (assistant_msg)
+deactivate MessagesTable
+
+ChatOrchestrator -> SocketLayer: emit_event('channel-events', {type: 'final', data: assistant_msg}, room=chat_id)
+activate SocketLayer
+SocketLayer --> ChatOrchestrator: (ack)
+deactivate SocketLayer
+
+ChatOrchestrator --> ChatRouter: Completion Result (e.g., assistant_msg)
+deactivate ChatOrchestrator
+
+ChatRouter -> WA: Create HTTP Response (optional, often handled via WS)
+WA -> FE: 200 OK (or acknowledgement, streaming happens via WS)
+
+deactivate ChatRouter
+
+@enduml 

@@ -1,0 +1,53 @@
+@startuml C4_Container_Oui_Backend
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Container Diagram for Open WebUI Backend
+
+' Actors
+Person(end_user, "End User", "Uses the system via the frontend.")
+Person(admin_user, "Admin User", "Manages the system via the frontend.")
+
+' External Systems (abbreviated from Context diagram for clarity)
+System_Ext(llm_services, "LLM Services", "E.g., Ollama, OpenAI API")
+System_Ext(oauth_idp, "Identity Provider / OAuth", "Handles external user authentication.")
+System_Ext(ldap_service, "LDAP Service", "Handles external user authentication.")
+System_Ext(web_search_apis, "Web Search APIs", "Provides web search results.")
+System_Ext(image_gen_services, "Image Generation Services", "Generates images.")
+System_Ext(audio_services, "Audio Services", "Handles STT/TTS.")
+System_Ext(code_exec_engine, "Code Execution Engine", "Executes code.")
+System_Ext(doc_intel_services, "Document Intelligence Services", "Parses documents.")
+
+' External Containers (Data Stores & Cache)
+ContainerDb(database, "Database", "SQL Database (e.g., PostgreSQL, SQLite)", "Stores users, chats, messages, configs, etc.")
+ContainerDb(vector_db, "Vector Database", "Vector Store (e.g., ChromaDB, Qdrant)", "Stores document embeddings for RAG.")
+Container(redis, "Redis", "In-Memory Cache/Broker", "Optional: Manages WebSocket state and message brokering for scaling.")
+
+' System Boundary
+System_Boundary(c1, "Open WebUI Backend System") {
+    Container(frontend_spa, "Frontend SPA", "JavaScript, HTML, CSS", "Provides the user interface in the browser.")
+    Container(web_app, "Web Application", "Python, FastAPI", "Handles API requests, WebSockets, business logic, RAG, and external integrations.")
+}
+
+' Relationships - Actors to System
+Rel(end_user, frontend_spa, "Uses", "HTTPS")
+Rel(admin_user, frontend_spa, "Uses", "HTTPS")
+
+' Relationships - Frontend to Backend
+Rel(frontend_spa, web_app, "Makes API calls / Uses real-time features via", "HTTPS / WebSockets")
+
+' Relationships - Backend to Data Stores & Cache
+Rel(web_app, database, "Reads/Writes data using", "SQLAlchemy")
+Rel(web_app, vector_db, "Reads/Writes embeddings using", "Vector DB Client")
+Rel(web_app, redis, "Uses for scaling (optional)", "Redis Protocol")
+
+' Relationships - Backend to External Systems
+Rel(web_app, llm_services, "Interacts with", "HTTPS API")
+Rel(web_app, oauth_idp, "Authenticates via", "HTTPS Redirects")
+Rel(web_app, ldap_service, "Authenticates via", "LDAP Protocol")
+Rel(web_app, web_search_apis, "Queries using", "HTTPS API")
+Rel(web_app, image_gen_services, "Requests generation using", "HTTPS API")
+Rel(web_app, audio_services, "Requests processing using", "HTTPS API")
+Rel(web_app, code_exec_engine, "Sends code for execution via", "HTTPS API / Protocol")
+Rel(web_app, doc_intel_services, "Sends documents for parsing via", "HTTPS API")
+
+@enduml 

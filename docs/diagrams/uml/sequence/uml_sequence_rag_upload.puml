@@ -1,0 +1,61 @@
+@startuml Sequence_RAG_Upload
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+' Define participants
+actor "End User" as User
+participant "Frontend SPA" as FE
+participant "Web App\n(FastAPI)" as WA
+participant "Retrieval Router\n(/api/v1/retrieval)" as RetrievalRouter
+participant "Files Table\n(models/files.py)" as FilesTable
+participant "Storage Provider" as Storage
+participant "RAG Loader\n(retrieval/loaders/main.py)" as RAGLoader
+participant "Text Splitter\n(LangChain)" as Splitter
+participant "RAG Utils\n(retrieval/utils.py)" as RAGUtils
+participant "Vector DB Client\n(retrieval/vector/connector.py)" as VectorClient
+
+title Sequence Diagram: User Uploads File for RAG Processing
+
+User -> FE: Selects file to upload for RAG
+FE -> WA: POST /api/v1/retrieval/process/file (UploadFile, collection_name)
+WA -> RetrievalRouter: Handle /process/file request
+
+RetrievalRouter -> FilesTable: create_file(user_id, filename, ...)
+activate FilesTable
+FilesTable -> Storage: save_file(file_content)
+activate Storage
+Storage --> FilesTable: file_path / success
+deactivate Storage
+FilesTable --> RetrievalRouter: FileModel
+deactivate FilesTable
+
+RetrievalRouter -> RAGLoader: load(filename, content_type, file_path)
+activate RAGLoader
+RAGLoader --> RetrievalRouter: List[Document]
+deactivate RAGLoader
+
+RetrievalRouter -> Splitter: split_documents(docs)
+activate Splitter
+Splitter --> RetrievalRouter: List[Document] (chunks)
+deactivate Splitter
+
+RetrievalRouter -> RAGUtils: generate_embeddings(chunks)
+activate RAGUtils
+' Note: generate_embeddings might call specific engines (OpenAI, Ollama, Local)
+RAGUtils --> RetrievalRouter: List[embeddings]
+deactivate RAGUtils
+
+RetrievalRouter -> VectorClient: add(collection_name, docs=chunks, embeddings=embeddings, metadatas=...)
+activate VectorClient
+VectorClient --> RetrievalRouter: Success/Failure
+deactivate VectorClient
+
+RetrievalRouter -> FilesTable: update_file_status(file_id, status='processed')
+activate FilesTable
+FilesTable --> RetrievalRouter: Success/Failure
+deactivate FilesTable
+
+RetrievalRouter -> WA: Create HTTP Response
+WA -> FE: 200 OK / 400 Bad Request
+FE -> User: Show success/error message
+
+@enduml 

@@ -1,0 +1,78 @@
+@startuml UML_Class_Socket
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml ' For stereotypes
+
+title Class Diagram: Socket Module
+
+package "python_socketio" {
+  class AsyncServer {
+    + on(event, handler)
+    + emit(event, data, room=None, sid=None)
+    + enter_room(sid, room)
+    + leave_room(sid, room)
+    ' ... other methods
+  }
+  class ASGIApp {
+     ' Wraps AsyncServer for ASGI
+  }
+   class AsyncRedisManager {
+     ' Manages state across instances via Redis
+   }
+}
+
+package "open_webui.socket" {
+    class "main.py" as SocketMain {
+        + sio: AsyncServer
+        + app: ASGIApp
+        + SESSION_POOL: dict | RedisDict
+        + USER_POOL: dict | RedisDict
+        + USAGE_POOL: dict | RedisDict
+        + clean_up_lock: None | RedisLock
+        + get_models_in_use(): List[str]
+        + periodic_usage_pool_cleanup()
+        ' --- Event Handlers ---
+        + connect(sid, environ, auth) <<event>>
+        + user_join(sid, data) <<event>>
+        + usage(sid, data) <<event>>
+        + disconnect(sid) <<event>>
+        ' ... other event handlers ...
+        ' --- Emitter Helpers ---
+        + get_event_emitter() : function
+        + get_event_call() : function
+    }
+
+    class "utils.py" as SocketUtils {
+        class RedisDict {
+            + __init__(name, redis_url)
+            + __setitem__(key, value)
+            + __getitem__(key)
+            + __delitem__(key)
+            + items()
+            ' ... other dict methods ...
+        }
+        class RedisLock {
+             + __init__(redis_url, lock_name, timeout_secs)
+             + aquire_lock(): bool
+             + release_lock()
+             + renew_lock(): bool
+        }
+    }
+
+}
+
+' Relationships
+SocketMain --> AsyncServer : creates/uses >
+SocketMain --> ASGIApp : creates/uses >
+SocketMain ..> AsyncRedisManager : uses (optional) >
+SocketMain ..> RedisDict : uses (optional) >
+SocketMain ..> RedisLock : uses (optional) >
+
+AsyncServer ..> AsyncRedisManager : uses (client_manager) >
+RedisDict ..> RedisLock : (dependency implied by usage pattern)
+
+' Indicate handlers are registered with AsyncServer
+SocketMain::connect ..> AsyncServer : @sio.event
+SocketMain::user_join ..> AsyncServer : @sio.on
+SocketMain::usage ..> AsyncServer : @sio.on
+SocketMain::disconnect ..> AsyncServer : @sio.event
+
+@enduml 

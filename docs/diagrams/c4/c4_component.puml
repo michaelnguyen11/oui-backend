@@ -1,0 +1,98 @@
+@startuml C4_Component_Oui_Backend
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Component Diagram for Open WebUI Backend - Web Application Container
+
+' External Containers and Systems (needed for context)
+Container(frontend_spa, "Frontend SPA", "JavaScript, HTML, CSS", "Provides the user interface.")
+ContainerDb(database, "Database", "SQL Database", "Stores application data.")
+ContainerDb(vector_db, "Vector Database", "Vector Store", "Stores document embeddings.")
+Container(redis, "Redis", "In-Memory Store", "Optional: WebSocket scaling/caching.")
+System_Ext(llm_services, "LLM Services", "External/Local LLMs.")
+System_Ext(oauth_idp, "Identity Provider / OAuth", "External Auth.")
+System_Ext(ldap_service, "LDAP Service", "External Auth.")
+System_Ext(web_search_apis, "Web Search APIs", "External Search.")
+System_Ext(image_gen_services, "Image Generation Services", "External Image Gen.")
+System_Ext(audio_services, "Audio Services", "External STT/TTS.")
+System_Ext(code_exec_engine, "Code Execution Engine", "External Code Exec.")
+System_Ext(doc_intel_services, "Document Intelligence Services", "External Doc Parsing.")
+
+' Container Boundary (Web Application)
+Container_Boundary(web_app, "Web Application (FastAPI)") {
+
+    Component(web_server, "Web Server Core", "FastAPI, Uvicorn", "Handles HTTP/WebSocket requests, middleware, routing.")
+    Component(api_routers, "API Routers", "Python Modules (`routers/*.py`)", "Defines API endpoints, handles request validation and orchestration.")
+    Component(realtime_layer, "Real-time Layer", "Socket.IO, Python", "Manages WebSocket connections, rooms, and real-time event broadcasting.")
+    Component(config_manager, "Configuration Manager", "Python (`config.py`, `env.py`)", "Loads and provides access to layered application configuration.")
+    Component(auth_utils, "Auth Utilities", "Python (`utils/auth.py`)", "Handles JWT, passwords, API keys, provides auth dependencies.")
+    Component(oauth_utils, "OAuth Utilities", "Python (`utils/oauth.py`)", "Manages OAuth2 authentication flows.")
+    Component(rag_logic, "RAG Logic", "Python (`retrieval/`)", "Handles document ingestion, embedding, vector search, reranking, web search.")
+    Component(db_layer, "Database Layer", "SQLAlchemy, Python (`models/`, `internal/db.py`)", "Manages data models, data access, sessions, and migrations.")
+    Component(misc_utils, "Misc Utilities", "Python (`utils/*`)", "Provides shared helpers (logging, permissions, PDF gen, etc.).")
+
+    ' Sub-components (optional detail, can be commented out if too complex)
+    ' Boundary(c2, "Database Layer Detail") {
+    '     Component(orm_models, "ORM Models", "SQLAlchemy Models")
+    '     Component(data_access, "Data Access Logic", "CRUD Methods")
+    '     Component(session_mgmt, "Session Management", "Session Handling")
+    '     Rel(data_access, orm_models, "Uses")
+    '     Rel(data_access, session_mgmt, "Uses")
+    ' }
+    ' Boundary(c3, "RAG Logic Detail") {
+    '     Component(doc_loaders, "Document Loaders", "`loaders/`")
+    '     Component(vector_client, "Vector DB Client", "`vector/`")
+    '     Component(query_embed_utils, "Querying & Embedding Utils", "`utils.py`")
+    '     Component(web_search, "Web Search Integration", "`web/`")
+    '     Rel(rag_logic, doc_loaders, "Uses")
+    '     Rel(rag_logic, vector_client, "Uses")
+    '     Rel(rag_logic, query_embed_utils, "Uses")
+    '     Rel(rag_logic, web_search, "Uses")
+    ' }
+
+
+    ' Internal Relationships
+    Rel(web_server, api_routers, "Routes HTTP requests to")
+    Rel(web_server, realtime_layer, "Handles WebSocket connections for")
+    Rel(api_routers, auth_utils, "Uses for authentication/authorization", "Depends")
+    Rel(api_routers, db_layer, "Uses for data access")
+    Rel(api_routers, rag_logic, "Uses for RAG operations")
+    Rel(api_routers, misc_utils, "Uses shared helpers")
+    Rel(api_routers, oauth_utils, "Initiates flows via")
+
+    Rel(realtime_layer, auth_utils, "Uses for authentication")
+    Rel(realtime_layer, db_layer, "Uses (e.g., to get channels)")
+
+    Rel(rag_logic, db_layer, "Uses (e.g., for file metadata)")
+
+    Rel(db_layer, config_manager, "Reads DB URL from") ' Implicitly via engine setup
+    Rel(auth_utils, db_layer, "Uses (to fetch users)")
+    Rel(oauth_utils, db_layer, "Uses (to fetch/create users)")
+
+    ' Relationships showing most components reading config (can be simplified if too noisy)
+    Rel(web_server, config_manager, "Reads config")
+    Rel(api_routers, config_manager, "Reads config")
+    Rel(realtime_layer, config_manager, "Reads config")
+    Rel(auth_utils, config_manager, "Reads config")
+    Rel(oauth_utils, config_manager, "Reads config")
+    Rel(rag_logic, config_manager, "Reads config")
+    Rel(misc_utils, config_manager, "Reads config")
+}
+
+' Relationships to External Containers/Systems
+Rel(frontend_spa, web_server, "Connects to", "HTTPS / WebSockets")
+
+Rel(db_layer, database, "Reads/Writes data using", "SQLAlchemy")
+Rel(rag_logic, vector_db, "Reads/Writes embeddings via client") ' Indirect via Vector DB Client component
+Rel(realtime_layer, redis, "Uses for scaling (optional)")
+
+Rel(api_routers, llm_services, "Sends requests to", "HTTPS API") ' Can be more specific if needed
+Rel(api_routers, web_search_apis, "Queries using", "HTTPS API") ' Through RAG Logic
+Rel(api_routers, image_gen_services, "Requests generation using", "HTTPS API")
+Rel(api_routers, audio_services, "Requests processing using", "HTTPS API")
+Rel(api_routers, code_exec_engine, "Sends code for execution", "HTTPS API / Protocol") ' Through Misc Utils?
+Rel(api_routers, doc_intel_services, "Sends documents for parsing", "HTTPS API") ' Through RAG Logic
+
+Rel(oauth_utils, oauth_idp, "Interacts with", "HTTPS Redirects")
+Rel(auth_utils, ldap_service, "Authenticates via", "LDAP Protocol") ' Likely invoked from API Router
+
+@enduml 

@@ -1,0 +1,55 @@
+@startuml UML_Class_Finetuning_Export
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Class Diagram: Proposed Fine-tuning Export Components
+
+' Existing Relevant Components (Simplified)
+component "ChatTable" as ChatTable
+component "MessageTable" as MessageTable
+component "UserTable" as UserTable
+component "Admin Router" as AdminRouter
+component "get_admin_user" as AuthDep
+
+' New/Proposed Components
+class FineTuningExporter {
+  + export_data(params: ExportParams): ExportResult
+  - _fetch_raw_data(params): List[RawMessageData]
+  - _process_data(raw_data): List[FormattedData]
+  - _save_data(formatted_data, format): FilePath
+}
+note right of FineTuningExporter::export_data
+  Orchestrates fetching, processing, saving.
+  Respects consent flags in params/fetched data.
+end note
+
+class DataProcessor {
+  + process(raw_data: List[RawMessageData]): List[FormattedData]
+  - _clean_text(text): str
+  - _scrub_pii(text): str
+  - _format_conversation(messages): FormattedData
+}
+note right of DataProcessor::process
+  Handles cleaning, PII scrubbing,
+  and formatting to target structure (e.g., JSONL).
+end note
+
+class ExportParams <<(P) Pydantic>> {
+  + start_date: Optional[date]
+  + end_date: Optional[date]
+  + target_format: str ' e.g., "jsonl"
+  + user_ids: Optional[List[str]]
+  + require_consent: bool = True
+  + min_quality: Optional[int]
+  ' ... other filters ...
+}
+
+' Relationships
+AdminRouter ..> FineTuningExporter : Calls export_data()
+AdminRouter ..> AuthDep : Uses (Depends)
+FineTuningExporter ..> ChatTable : Queries
+FineTuningExporter ..> MessageTable : Queries
+FineTuningExporter ..> UserTable : Queries (for consent?)
+FineTuningExporter ..> DataProcessor : Uses process()
+FineTuningExporter ..> ExportParams : Uses
+
+@enduml 

@@ -1,0 +1,127 @@
+@startuml C4_Code_Class_Chat_Messages
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml ' Include for stereotypes if needed
+
+' Stereotypes (Optional, for clarity)
+' stereotype BaseModel <<Pydantic>>
+' stereotype SqlAlchemyModel <<SQLAlchemy>>
+' stereotype DataAccess <<Table>>
+
+title Class Diagram: Chat & Message Data Structures
+
+' Base Classes (Conceptual)
+abstract class BaseModel <<(P) Pydantic>>
+abstract class Base <<(S) SQLAlchemy>>
+
+' SQLAlchemy Models
+class Chat <<(S) SQLAlchemy>> extends Base {
+  + id: String <<PK>>
+  + user_id: String
+  + title: Text
+  + chat: JSON ' Likely stores message structure
+  + created_at: BigInteger
+  + updated_at: BigInteger
+  + share_id: Text <<Nullable>>
+  + archived: Boolean
+  + pinned: Boolean <<Nullable>>
+  + meta: JSON ' Stores tags, etc.
+  + folder_id: Text <<Nullable>>
+}
+
+class Message <<(S) SQLAlchemy>> extends Base {
+  + id: Text <<PK>>
+  + user_id: String
+  + channel_id: Text <<Nullable>> ' FK to Chat.id
+  + parent_id: Text <<Nullable>> ' FK to Message.id (self-ref)
+  + content: Text
+  + data: JSON <<Nullable>>
+  + meta: JSON <<Nullable>>
+  + created_at: BigInteger
+  + updated_at: BigInteger
+}
+
+class MessageReaction <<(S) SQLAlchemy>> extends Base {
+  + id: Text <<PK>>
+  + user_id: Text
+  + message_id: Text ' FK to Message.id
+  + name: Text ' e.g., emoji name
+  + created_at: BigInteger
+}
+
+' Pydantic Models (Core Data Transfer/Validation)
+class ChatModel <<(P) Pydantic>> extends BaseModel {
+  + id: str
+  + user_id: str
+  + title: str
+  + chat: dict
+  + created_at: int
+  + updated_at: int
+  + share_id: Optional[str]
+  + archived: bool
+  + pinned: Optional[bool]
+  + meta: dict
+  + folder_id: Optional[str]
+}
+
+class MessageModel <<(P) Pydantic>> extends BaseModel {
+  + id: str
+  + user_id: str
+  + channel_id: Optional[str]
+  + parent_id: Optional[str]
+  + content: str
+  + data: Optional[dict]
+  + meta: Optional[dict]
+  + created_at: int
+  + updated_at: int
+}
+
+class MessageReactionModel <<(P) Pydantic>> extends BaseModel {
+  + id: str
+  + user_id: str
+  + message_id: str
+  + name: str
+  + created_at: int
+}
+
+' Data Access Classes
+class ChatTable <<Table>> {
+  + insert_new_chat(user_id, form_data): ChatModel
+  + import_chat(user_id, form_data): ChatModel
+  + update_chat_by_id(id, chat): ChatModel
+  + get_chat_by_id(id): ChatModel
+  + get_chat_list_by_user_id(user_id, ...): List[ChatModel]
+  + get_chat_title_id_list_by_user_id(...): List[ChatTitleIdResponse]
+  + delete_chat_by_id(id): bool
+  + update_chat_tags_by_id(id, tags, user): ChatModel
+  ' ... other methods omitted for brevity ...
+}
+
+class MessageTable <<Table>> {
+  + insert_new_message(form_data, channel_id, user_id): MessageModel
+  + get_message_by_id(id): MessageResponse ' Note: Returns enriched model
+  + get_replies_by_message_id(id): List[MessageModel]
+  + get_messages_by_channel_id(channel_id, ...): List[MessageModel]
+  + delete_message_by_id(id): bool
+  + add_reaction_to_message(id, user_id, name): MessageReactionModel
+  + get_reactions_by_message_id(id): List[Reactions] ' Reactions is another Pydantic model
+  ' ... other methods omitted for brevity ...
+}
+
+
+' Relationships
+ChatTable ..> Chat : Uses/Manipulates
+ChatTable ..> ChatModel : Creates/Returns
+ChatTable ..> BaseModel : Uses Chat forms (dep.)
+
+MessageTable ..> Message : Uses/Manipulates
+MessageTable ..> MessageReaction : Uses/Manipulates
+MessageTable ..> MessageModel : Creates/Returns
+MessageTable ..> MessageReactionModel : Creates/Returns
+MessageTable ..> BaseModel : Uses Message forms (dep.)
+
+' Conceptual/Data Relationships
+Chat "1" *--> "0..*" Message : contains (via channel_id)
+Message "1" *--> "0..*" Message : replies to (via parent_id)
+Message "1" *--> "0..*" MessageReaction : has reactions
+
+@enduml 

@@ -94,3 +94,19 @@ This will typically start the FastAPI server (often using Uvicorn). You can then
 ├── requirements.txt # Python dependencies
 ├── start.sh # Linux/macOS start script
 └── start_windows.bat # Windows start script
+
+## Documentation Structure (`docs/`)
+
+This project includes detailed architecture documentation within the `docs/` folder to aid understanding. It is organized as follows:
+
+*   **`docs/understanding_the_backend.md`**: A guided tour and recommended steps for new contributors to understand the codebase using the available documentation. **Start here!**
+*   **`docs/architecture/`**: Contains markdown files describing the different architectural components and concepts:
+    *   `architecture.md`: High-level system overview.
+    *   Component-specific files (e.g., `web_server.md`, `database_layer.md`, `rag_logic.md`, `real_time_layer.md`, `api_routers.md`, `configuration.md`, `utilities.md`, etc.).
+    *   Deeper dives into specific components (e.g., `deep_dive_api_routers.md`).
+*   **`docs/diagrams/`**: Contains source files for architectural diagrams (using PlantUML). You can render these using PlantUML tools.
+    *   `c4/`: C4 model diagrams (Context, Container, Component).
+    *   `uml/`: Detailed UML diagrams.
+        *   `class/`: UML Class diagrams for key data structures or modules.
+        *   `sequence/`: UML Sequence diagrams illustrating important workflows.
+*   **`docs/features/`**: Documentation related to specific features or implementation proposals (e.g., `fine_tuning_export/`).

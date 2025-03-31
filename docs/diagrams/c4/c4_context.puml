@@ -1,0 +1,43 @@
+@startuml C4_Context_Oui_Backend
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title System Context Diagram for Open WebUI Backend
+
+Person(end_user, "End User", "Interacts via Frontend to chat, manage documents, use AI features.")
+Person(admin_user, "Admin User", "Manages users, system configurations, etc. via Frontend.")
+
+System_Ext(frontend_app, "Frontend Application", "Browser-based SPA providing the User Interface.")
+
+System(oui_backend, "Open WebUI Backend", "Provides APIs for LLM interactions, RAG, user management, external service integration.")
+
+System_Ext(database, "Database", "Stores application data (users, chats, configs, etc.). E.g., PostgreSQL, SQLite.")
+System_Ext(vector_db, "Vector Database", "Stores document embeddings for RAG. E.g., ChromaDB, Qdrant.")
+System_Ext(llm_services, "LLM Services", "External or Local Large Language Models. E.g., Ollama, OpenAI API.")
+System_Ext(oauth_idp, "Identity Provider / OAuth", "External systems for user authentication. E.g., Google, OIDC.")
+System_Ext(ldap_service, "LDAP Service", "External directory service for user authentication.")
+System_Ext(web_search_apis, "Web Search APIs", "Provides web search results for RAG. E.g., Tavily, Google, Bing.")
+System_Ext(image_gen_services, "Image Generation Services", "External services for image generation. E.g., DALL-E, Automatic1111.")
+System_Ext(audio_services, "Audio Services", "External services for STT/TTS. E.g., Whisper, Azure Speech.")
+System_Ext(code_exec_engine, "Code Execution Engine", "External service for executing code snippets. E.g., Jupyter.")
+System_Ext(doc_intel_services, "Document Intelligence Services", "External services for advanced document parsing. E.g., Tika, Azure AI.")
+System_Ext(redis, "Redis", "Optional cache & message broker for scaling WebSockets.")
+
+' Relationships
+Rel(end_user, frontend_app, "Uses")
+Rel(admin_user, frontend_app, "Uses")
+
+Rel_Neighbor(frontend_app, oui_backend, "Makes API calls to / Receives real-time updates from", "HTTPS / WebSockets")
+
+Rel(oui_backend, database, "Reads/Writes application data using", "SQLAlchemy")
+Rel(oui_backend, vector_db, "Reads/Writes embeddings using", "Vector DB Client")
+Rel(oui_backend, llm_services, "Sends prompts to / Gets responses from", "HTTPS API")
+Rel(oui_backend, oauth_idp, "Authenticates users via", "OAuth2 Redirects/Callbacks")
+Rel(oui_backend, ldap_service, "Authenticates users via", "LDAP Protocol")
+Rel(oui_backend, web_search_apis, "Queries for search results using", "HTTPS API")
+Rel(oui_backend, image_gen_services, "Requests image generation using", "HTTPS API")
+Rel(oui_backend, audio_services, "Requests STT/TTS processing using", "HTTPS API")
+Rel(oui_backend, code_exec_engine, "Sends code for execution to", "HTTPS API / Protocol")
+Rel(oui_backend, doc_intel_services, "Sends documents for parsing to", "HTTPS API")
+Rel(oui_backend, redis, "Uses for (optional)", "WebSocket Scaling / Caching")
+
+@enduml 

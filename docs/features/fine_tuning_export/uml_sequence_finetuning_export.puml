@@ -1,0 +1,44 @@
+@startuml Sequence_Finetuning_Export
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+\' Define participants
+actor "Admin User" as Admin
+participant "Frontend SPA" as FE
+participant "Web App\n(FastAPI)" as WA
+participant "Admin Router" as AdminRouter
+participant "FineTuningExporter" as Exporter
+participant "MessageTable / ChatTable" as DBTables
+participant "DataProcessor" as Processor
+
+title Sequence Diagram: Proposed Admin-Triggered Fine-tuning Export
+
+Admin -> FE: Initiates export request with parameters (date range, format, etc.)
+FE -> WA: POST /api/v1/admin/fine-tuning/export (ExportParams)
+WA -> AdminRouter: Handle /export request (params)
+activate AdminRouter
+
+AdminRouter -> Exporter: export_data(params)
+activate Exporter
+
+Exporter -> DBTables: Query messages/chats (filtering by params, checking consent)
+activate DBTables
+DBTables --> Exporter: List[RawMessageData]
+deactivate DBTables
+
+Exporter -> Processor: process(raw_data)
+activate Processor
+Processor -> Processor: Clean, Scrub PII, Format data
+Processor --> Exporter: List[FormattedData]
+deactivate Processor
+
+Exporter -> Exporter: Save formatted data to file
+Exporter --> AdminRouter: ExportResult (e.g., file path or success status)
+deactivate Exporter
+
+AdminRouter -> WA: Create HTTP Response
+WA -> FE: 200 OK (ExportResult)
+FE -> Admin: Display success message / download link
+
+deactivate AdminRouter
+
+@enduml 

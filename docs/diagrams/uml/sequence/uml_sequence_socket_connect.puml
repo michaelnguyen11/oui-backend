@@ -1,0 +1,52 @@
+@startuml Sequence_Socket_Connect
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Sequence Diagram: Client Connect & Authenticate (WebSocket)
+
+participant "Frontend SPA" as FE
+participant "Socket.IO Server\n(socket/main.py)" as SIO_Server
+participant "Auth Utilities\n(utils/auth.py)" as AuthUtils
+participant "Users Table\n(models/users.py)" as UsersTable
+participant "State Pools\n(SESSION_POOL, USER_POOL)" as StatePools
+
+FE -> SIO_Server: Establish WebSocket Connection (sends auth token)
+activate SIO_Server
+
+SIO_Server -> SIO_Server: Trigger 'connect' event handler
+SIO_Server -> AuthUtils: decode_token(auth_token)
+activate AuthUtils
+AuthUtils --> SIO_Server: decoded_payload (e.g., {'id': user_id}) or None
+deactivate AuthUtils
+
+opt Token Valid and Payload Found
+    SIO_Server -> UsersTable: get_user_by_id(user_id)
+    activate UsersTable
+    UsersTable --> SIO_Server: UserModel or None
+    deactivate UsersTable
+
+    opt User Found
+        SIO_Server -> StatePools: Store session info (SESSION_POOL[sid] = user)
+        activate StatePools
+        SIO_Server -> StatePools: Add sid to user's list (USER_POOL[user_id].append(sid))
+        StatePools --> SIO_Server: OK
+        deactivate StatePools
+
+        SIO_Server -> FE: emit('connect_success') (Implicit - client knows connection succeeded)
+        SIO_Server -> SIO_Server: emit('user-list', {user_ids: ...}) ' Broadcast update
+        SIO_Server -> SIO_Server: emit('usage', {models: ...}) ' Send current usage
+
+        ' Client might then explicitly call 'user-join' to enter rooms
+        FE -> SIO_Server: emit('user-join', {auth: {...}})
+        SIO_Server -> SIO_Server: Handle 'user-join' (fetch channels, enter rooms)
+        ' ... (Further interactions for joining rooms) ...
+        SIO_Server -> FE: return {'id': user.id, 'name': user.name}
+    else User Not Found
+        SIO_Server -> FE: emit('auth_error', 'User not found') / Disconnect
+    end
+else Token Invalid or Not Provided
+    SIO_Server -> FE: emit('auth_error', 'Invalid token') / Disconnect
+end
+
+deactivate SIO_Server
+
+@enduml 

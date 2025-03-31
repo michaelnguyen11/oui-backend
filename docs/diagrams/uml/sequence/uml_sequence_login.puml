@@ -1,0 +1,45 @@
+@startuml Sequence_User_Login
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+' Define participants
+actor "End User" as User
+participant "Frontend SPA" as FE
+participant "Web App\n(FastAPI)" as WA
+participant "Auth Router\n(/api/v1/auths)" as AuthRouter
+participant "Auth Utilities\n(utils/auth.py)" as AuthUtils
+participant "Auths Table\n(models/auths.py)" as AuthsTable
+participant "Users Table\n(models/users.py)" as UsersTable
+
+title Sequence Diagram: User Login (Email/Password)
+
+User -> FE: Enters email and password
+FE -> WA: POST /api/v1/auths/signin (SigninForm)
+WA -> AuthRouter: Handle /signin request
+AuthRouter -> AuthsTable: authenticate_user(email, password)
+activate AuthsTable
+AuthsTable -> AuthUtils: verify_password(plain, hashed)
+activate AuthUtils
+AuthUtils --> AuthsTable: boolean (password match)
+AuthsTable -> UsersTable: get_user_by_email(email) ' If password verified
+activate UsersTable
+UsersTable --> AuthsTable: UserModel or None
+deactivate UsersTable
+AuthsTable --> AuthRouter: UserModel or None
+deactivate AuthsTable
+deactivate AuthUtils
+
+alt Password Correct & User Found
+    AuthRouter -> AuthUtils: create_token(data={id: user.id}, expires_delta)
+    activate AuthUtils
+    AuthUtils --> AuthRouter: jwt_token
+    deactivate AuthUtils
+    AuthRouter -> WA: Create HTTP Response with token
+    WA -> FE: 200 OK (SessionUserResponse with token)
+    FE -> User: Set auth cookie, redirect to dashboard
+else Password Incorrect or User Not Found
+    AuthRouter -> WA: Raise HTTPException (400/401)
+    WA -> FE: 400 Bad Request or 401 Unauthorized
+    FE -> User: Show login error message
+end
+
+@enduml 

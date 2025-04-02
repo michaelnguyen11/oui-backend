@@ -92,6 +92,7 @@ log_sources = [
     "WEBHOOK",
     "SOCKET",
     "OAUTH",
+    "SMOLAGENTS",
 ]
 
 SRC_LOG_LEVELS = {}
@@ -442,3 +443,24 @@ AUDIT_EXCLUDED_PATHS = os.getenv("AUDIT_EXCLUDED_PATHS", "/chats,/chat,/folders"
 )
 AUDIT_EXCLUDED_PATHS = [path.strip() for path in AUDIT_EXCLUDED_PATHS]
 AUDIT_EXCLUDED_PATHS = [path.lstrip("/") for path in AUDIT_EXCLUDED_PATHS]
+
+ENABLE_BEDROCK_API = os.getenv("ENABLE_BEDROCK_API", "false").lower() == "true"
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN")
+
+SRC_LOG_LEVELS = {
+    "MAIN": logging.getLogger("main").getEffectiveLevel(),
+    "OLLAMA": logging.getLogger("ollama").getEffectiveLevel(),
+    "OPENAI": logging.getLogger("openai").getEffectiveLevel(),
+    "BEDROCK": logging.getLogger("bedrock").getEffectiveLevel(),
+    "SMOLAGENTS": logging.getLogger("smolagents").getEffectiveLevel(),
+}
+
+# Add SmolAgents configuration
+ENABLE_SMOLAGENTS = os.getenv("ENABLE_SMOLAGENTS", "false").lower() == "true"
+SMOLAGENTS_MAX_AGENTS = int(os.getenv("SMOLAGENTS_MAX_AGENTS", "10"))
+SMOLAGENTS_MAX_TOOLS = int(os.getenv("SMOLAGENTS_MAX_TOOLS", "20"))
+SMOLAGENTS_DEFAULT_MODEL = os.getenv("SMOLAGENTS_DEFAULT_MODEL", "gpt-3.5-turbo")
+SMOLAGENTS_DEFAULT_TEMPERATURE = float(os.getenv("SMOLAGENTS_DEFAULT_TEMPERATURE", "0.7"))

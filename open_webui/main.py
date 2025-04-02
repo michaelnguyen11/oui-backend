@@ -76,6 +76,8 @@ from open_webui.routers import (
     tools,
     users,
     utils,
+    bedrock,
+    smolagents,
 )
 
 from open_webui.routers.retrieval import (
@@ -868,6 +870,7 @@ app.mount("/ws", socket_app)
 
 app.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
 app.include_router(openai.router, prefix="/openai", tags=["openai"])
+app.include_router(bedrock.router, prefix="/bedrock", tags=["bedrock"])
 
 
 app.include_router(pipelines.router, prefix="/api/v1/pipelines", tags=["pipelines"])
@@ -1397,3 +1400,33 @@ else:
     log.warning(
         f"Frontend build directory not found at '{FRONTEND_BUILD_DIR}'. Serving API only."
     )
+
+########################################
+#
+# BEDROCK
+#
+########################################
+
+app.state.config.ENABLE_BEDROCK_API = os.getenv("ENABLE_BEDROCK_API", "false").lower() == "true"
+app.state.config.AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+app.state.config.AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+app.state.config.AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+app.state.config.AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN")
+
+app.state.BEDROCK_MODELS = {}
+
+########################################
+#
+# SMOLAGENTS
+#
+########################################
+
+app.state.config.ENABLE_SMOLAGENTS = ENABLE_SMOLAGENTS
+app.state.config.SMOLAGENTS_MAX_AGENTS = SMOLAGENTS_MAX_AGENTS
+app.state.config.SMOLAGENTS_MAX_TOOLS = SMOLAGENTS_MAX_TOOLS
+app.state.config.SMOLAGENTS_DEFAULT_MODEL = SMOLAGENTS_DEFAULT_MODEL
+app.state.config.SMOLAGENTS_DEFAULT_TEMPERATURE = SMOLAGENTS_DEFAULT_TEMPERATURE
+
+# Add SmolAgents router
+if app.state.config.ENABLE_SMOLAGENTS:
+    app.include_router(smolagents.router, prefix="/api/v1/smolagents", tags=["smolagents"])
